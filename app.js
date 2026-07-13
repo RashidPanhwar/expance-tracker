@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import authRoutes from "./src/routes/auth.rooutes.js";
 
 const app = express();
 
@@ -25,8 +26,13 @@ app.use((cors()));
 //   }
 // }));
 
+
+
 app.get("/", (req, res) => {
   res.json({success: true, message: "Welcome to Expense Tracker API"});
 });
+console.log("API Prefix:", process.env.API_PREFIX);
+app.use(`/api/v1/auth`, authRoutes);
+// app.use(`${process.env.API_PREFIX}/auth`, authRoutes);
 
 export default app;
