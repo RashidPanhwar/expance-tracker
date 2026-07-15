@@ -87,17 +87,6 @@ export const signup = async ({ firstName, lastName, email, password }) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // userSchema.pre("save", async function (next) {
-    //     if(!this.isModified("password")) return next();
-    //     this.password = await bcrypt.hash(this.password, 10);
-
-    //     next();
-    // });
-
-    // userSchema.methods.comparePassword = async function(password) {
-    //     return await bcrypt.compare(password, this.password);
-    // };
-
     const newUser = await User.create({
         firstName,
         lastName,
@@ -114,5 +103,18 @@ export const signup = async ({ firstName, lastName, email, password }) => {
         user: user,
         accessToken,
     }
-
 }
+
+export const getUserById = async (id) => {
+    console.log("id in service", id)
+    const user = await User.findById(id);
+
+    if(!user) {
+        throw new Error("User Not Found");
+    }
+
+    const token = generateAccessToken({id: user._id, email: user.email})
+    
+    return {user, token}
+
+} 
