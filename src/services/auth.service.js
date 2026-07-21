@@ -4,9 +4,10 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../utils/jwt.js";
 import { sendMail } from "./mail.service.js";
-import OTP, { otpSchema } from "../models/otp.model.js";
+import OTP from "../models/otp.model.js";
 
 export const login = async ({ email, password }) => {
+
     if (!email || !password) {
         throw new Error("Email and password are required");
     }
@@ -15,6 +16,12 @@ export const login = async ({ email, password }) => {
 
     if (!user) {
         throw new Error("Invalid email or password");
+    }
+
+    if(user.isVerified !== true) {
+        const error = new Error("Please verify your email first.");
+        error.statusCode = 403;
+        throw error
     }
 
     if (user.lockUntil && user.lockUntil >= new Date()) {
@@ -66,14 +73,12 @@ export const login = async ({ email, password }) => {
     )
     await user.save();
 
-
     return {
         user: user,
         accessToken,
     }
 
 }
-
 
 export const signup = async ({ firstName, lastName, email, password }) => {
 
@@ -96,19 +101,66 @@ export const signup = async ({ firstName, lastName, email, password }) => {
         password: hashedPassword,
     });
 
-    const accessToken = generateAccessToken({ id: newUser._id, email: newUser.email });
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const user = await User.findById(newUser._id);
-    // await newUser.save();
+    const token = generateAccessToken({ id: newUser._id, email: newUser.email });
+
+    await OTP.deleteOne({userId: newUser._id});
+
+    await OTP.create({
+        userId: newUser._id,
+        otp: otp,
+        expireAt: new Date(Date.now() + 2 * 60 * 1000)
+    })
+
+    await sendMail({
+        to: newUser.email,
+        subject: "Verification code send to your email",
+        text: `Please verify your account by ${otp}`
+    })
 
     return {
-        user: user,
-        accessToken,
+        userId: newUser._id
+    }
+}
+
+export const verifyEmail = async ({userId, otp}) => {
+    if(!userId || !otp) {
+        throw new Error("UserId and OTP Both Are Required");
+    }
+
+    const user = await User.findById(userId);
+
+    if(!user) {
+        throw new Error("User Not Found");
+    }
+
+    const storedOtp = await OTP.findOne({userId: user._id});
+
+    if(!storedOtp) {
+        throw new Error("OTP Mismatch");
+    }
+
+    if(storedOtp.expireAt.getTime() < Date.now()) {
+        throw new Error("OTP Expired!");
+    }
+
+    if(String(storedOtp.otp) !== String(otp)) {
+        throw new Error("Please Put Valid OTP");
+    }
+
+    await storedOtp.deleteOne();
+
+    user.isVerified = true
+    await user.save()
+
+    return {
+        success: true,
+        message: "OTP Verified Sucessfully"
     }
 }
 
 export const getUserById = async (id) => {
-    console.log("id in service", id)
     const user = await User.findById(id);
 
     if(!user) {
@@ -121,7 +173,8 @@ export const getUserById = async (id) => {
 
 } 
 
-export const forgetPassword = async (email) => {
+export const sendOtp = async (email) => {
+
     if(!email) {
         throw new Error("Email is Required")
     }
@@ -131,7 +184,7 @@ export const forgetPassword = async (email) => {
         throw new Error("Email Not Exist")
     }
 
-    const accessToken = generateAccessToken({ id: user._id, email: user.email });
+    const token = generateAccessToken({ id: user._id, email: user.email });
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -149,20 +202,13 @@ export const forgetPassword = async (email) => {
         text: `Your password reset OTP is ${otp}. This OTP is valid for 10 minutes.`,
     });
 
-
-
-    console.log("User", user);
-
     return {
-        accessToken
+        token
     }
 }
 
 export const verifyOTP = async ({userId, otp}) => {
     const otpRecord = await OTP.findOne({userId});
-
-    console.log("DB OTP:", otpRecord.otp, typeof otpRecord.otp);
-    console.log("User OTP:", otp, typeof otp);
 
     if(!otpRecord) {
         throw new Error("OTP not found");
@@ -204,7 +250,31 @@ export const resetPassword = async ({userId, newPassword}) => {
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save()
 
-    console.log("find user", user)
+    return {
+        success: true,
+        message: "Password Update Successfully"
+    }
+}
+
+export const changePassword = async ({userId, oldPassword, newPassword}) => {
+    
+    const user = await User.findById(userId).select("+password");
+
+    if(!user) {
+        throw new Error("User not found");
+    };
+
+    const isPasswordValid = bcrypt.compare(oldPassword, user.password);
+
+    if(!isPasswordValid) {
+        throw new Error("Wrong Password");
+    }
+
+    const updatedPassword = await bcrypt.hash(newPassword, 10)
+
+    user.password = updatedPassword
+    await user.save();
+
     return {
         success: true,
         message: "Password Update Successfully"

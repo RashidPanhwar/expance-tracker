@@ -33,7 +33,6 @@ export const loginMidleware = (req, res, next) => {
 
 
 export const authMiddleware = (req, res, next) => {
-    console.log("header token", req.headers.authorization.split(' ')[1])
     try {
         const authHeader = req.headers.authorization;
 
@@ -56,7 +55,6 @@ export const authMiddleware = (req, res, next) => {
         req.user = decoded;
         next();
     } catch (error) {
-        console.log("error", error)
         return res.status(401).json({
             success: false,
             message: "Invalid or expired token",

@@ -29,9 +29,25 @@ export const signup = async (req, res, next) => {
     }
 }
 
-export const forgetPassword = async (req, res, next) => {
+export const verifyEmail = async (req, res, next) => {
     try {
-        const result = await authService.forgetPassword(req.body);
+        const result = await authService.verifyEmail({
+            userId: req.body.userId,
+            otp: req.body.otp
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Email Varified Successfully",
+        })
+    } catch (error) {
+        next(error);
+    }
+}
+
+export const sendOtp = async (req, res, next) => {
+    try {
+        const result = await authService.sendOtp(req.body);
 
         return res.status(200).json({
             success: true,
@@ -71,7 +87,7 @@ export const verifyOTP = async (req, res, next) => {
             userId: req.user.id,
             otp: req.body.otp
         })
-        
+
         return res.status(200).json({
             success: true,
             message: "OTP verified successfully.",
@@ -85,17 +101,34 @@ export const verifyOTP = async (req, res, next) => {
 export const resetPassword = async (req, res, next) => {
     try {
         const result = await authService.resetPassword({
-        userId: req.user.id,
-        newPassword: req.body.password
-    })
+            userId: req.user.id,
+            newPassword: req.body.password
+        })
 
-    return res.status(201).json({
-        success: true,
-        message: "Password Update Successfully",
-    })
+        return res.status(201).json({
+            success: true,
+            message: "Password Update Successfully",
+        })
     } catch (error) {
         next(error)
     }
-    
+
+}
+
+export const changePassword = async (req, res, next) => {
+    try {
+        const result = await authService.changePassword({
+            userId: req.user.id,
+            oldPassword: req.body.oldPassword,
+            newPassword: req.body.newPassword
+        })
+
+        return res.status(201).json({
+            success: true,
+            message: "Password Changed Successfully",
+        })
+    } catch (error) {
+        next(error)
+    }
 }
 
